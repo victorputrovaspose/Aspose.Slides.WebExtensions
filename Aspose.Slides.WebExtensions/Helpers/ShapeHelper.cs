@@ -23,7 +23,7 @@ namespace Aspose.Slides.WebExtensions.Helpers
                 using (MemoryStream ms = new MemoryStream())
                 using (Bitmap image = GetShapeThumbnail(asShape))
                 {
-                    image.Save(ms, ImageFormat.Png);
+                    image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                     return "'data:image/png;base64, " + Convert.ToBase64String(ms.ToArray()) + "'";
                 }
             }
@@ -96,7 +96,7 @@ namespace Aspose.Slides.WebExtensions.Helpers
         {
             AutoShape autoShape = shape as AutoShape;
 
-            Bitmap thumbnail;
+            IImage thumbnail;
             if (autoShape != null && !string.IsNullOrEmpty(autoShape.TextFrame.Text))
             {
                 // Copy shape paragraphs -> remove text -> get shape image -> restore paragraphs. Export text as HTML markup in the template.
@@ -107,7 +107,7 @@ namespace Aspose.Slides.WebExtensions.Helpers
                 try
                 {
                     autoShape.TextFrame.Paragraphs.Clear();
-                    thumbnail = autoShape.GetThumbnail();
+                    thumbnail = autoShape.GetImage();
                 }
                 finally
                 {
@@ -117,14 +117,18 @@ namespace Aspose.Slides.WebExtensions.Helpers
             }
             else if (shape is IConnector)
             {
-                thumbnail = shape.GetThumbnail(ShapeThumbnailBounds.Appearance, 1, 1);
+                thumbnail = shape.GetImage(ShapeThumbnailBounds.Appearance, 1, 1);
             }
             else
             {
-                thumbnail = shape.GetThumbnail();
+                thumbnail = shape.GetImage();
             }
-
-            return thumbnail;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                thumbnail.Save(ms, ImageFormat.Png);
+                ms.Position = 0;
+                return new Bitmap(ms);
+            }
         }
 
         public static string GetSubstitutionMarkup(string templateMarkup, IShape shape, Point origin, string animationAttributes)

@@ -6,7 +6,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
-using Aspose.Slides.Util;
 using System.Collections.Generic;
 
 namespace Aspose.Slides.WebExtensions.Helpers
@@ -15,42 +14,19 @@ namespace Aspose.Slides.WebExtensions.Helpers
     {
         public static string GetImageURL<T>(IPPImage image, TemplateContext<T> model)
         {
-            string result = "";
             if (!model.Global.Get<bool>("embedImages"))
             {
                 var imgSrcPath = model.Output.GetResourcePath(image);
                 var slidesPath = model.Global.Get<string>("slidesPath");
-
-                result = ShapeHelper.ConvertPathToRelative(imgSrcPath, slidesPath);
+                return ShapeHelper.ConvertPathToRelative(imgSrcPath, slidesPath);
             }
-            else
+            using (MemoryStream s = new MemoryStream())
             {
-                byte[] dataSource = image.BinaryData;
-                if (image.ContentType == "image/x-emf" || image.ContentType == "image/x-wmf")
-                {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        Bitmap bitmap = MetafileToBitmap(image);
-                        bitmap.Save(ms, ImageFormat.Png);
-                        ms.Flush();
-                        dataSource = ms.ToArray();
-                    }
-                }
-                else if (image.ContentType == "image/tiff")
-                {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        Bitmap bitmap = new Bitmap(image.SystemImage);
-                        bitmap.Save(ms, ImageFormat.Png);
-                        ms.Flush();
-                        dataSource = ms.ToArray();
-                    }
-                }
-
-                result = "data:image/png;base64, " + Convert.ToBase64String(dataSource);
+                image.Image.Save(s, ImageFormat.Png);
+                s.Flush();
+                byte[] dataSource = s.ToArray();
+                return "data:image/png;base64, " + Convert.ToBase64String(dataSource);
             }
-
-            return result;
         }
 
         public static string Crop(string imgSrc, float cropLeft, float cropTop, float cropRight, float cropBottom)
@@ -79,7 +55,7 @@ namespace Aspose.Slides.WebExtensions.Helpers
                         g.Flush();
                     }
                     MemoryStream resultStream = new MemoryStream();
-                    resultBmp.Save(resultStream, ImageFormat.Png);
+                    resultBmp.Save(resultStream, System.Drawing.Imaging.ImageFormat.Png);
                     return String.Format("{1}{0}", Convert.ToBase64String(resultStream.ToArray()), b64prefix);
                 }
                 throw new NotImplementedException();
@@ -102,11 +78,12 @@ namespace Aspose.Slides.WebExtensions.Helpers
                 {
                     using (Image initialImage = System.Drawing.Bitmap.FromStream(tiffData))
                     {
-                        initialImage.Save(convertedFilePath, ImageFormat.Png);
+                        initialImage.Save(convertedFilePath, System.Drawing.Imaging.ImageFormat.Png);
                     }
                 }
             }
         }
+
         public static Bitmap GetShapeFillImage(Shape shape, IFillFormatEffectiveData format)
         {
             AutoShape aShape = shape as AutoShape;
@@ -123,7 +100,13 @@ namespace Aspose.Slides.WebExtensions.Helpers
                     }
                 }
 
-                Bitmap r = aShape.GetThumbnail();
+                Bitmap r;
+                using (MemoryStream s = new MemoryStream())
+                {
+                    aShape.GetImage().Save(s, ImageFormat.Png);
+                    s.Position = 0;
+                    r = new Bitmap(s);
+                }
 
                 for (int i = 0; i < store.Count; i++)
                 {
@@ -137,9 +120,15 @@ namespace Aspose.Slides.WebExtensions.Helpers
             }
             return null;
         }
+
         public static Bitmap MetafileToBitmap(IPPImage image)
         {
-            Metafile metafile = (Metafile)image.SystemImage;
+            Metafile metafile;
+            using (MemoryStream s = new MemoryStream())
+            {
+                image.Image.Save(s, ImageFormat.Png);
+                metafile = new Metafile(s);
+            }
             int h = metafile.Height;
             int w = metafile.Width;
             Bitmap bitmap = new Bitmap(w, h);
